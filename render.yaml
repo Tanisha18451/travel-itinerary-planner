@@ -1,0 +1,18 @@
+# Render Blueprint: one web service gives you one public link (https://<name>.onrender.com)
+services:
+  - type: web
+    name: wayfinder-trip-planner      # your link becomes https://wayfinder-trip-planner.onrender.com (a suffix is added if the name is taken)
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: LLM_API_KEY              # Groq key, enables real AI itineraries
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: VITE_SUPABASE_URL        # same value as SUPABASE_URL (used when building the site)
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY   # same value as SUPABASE_ANON_KEY
+        sync: false
