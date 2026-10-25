@@ -21,6 +21,9 @@ async function request(path, options = {}) {
       const body = await res.json();
       detail = Array.isArray(body.detail) ? body.detail.map((d) => d.msg).join("; ") : body.detail || detail;
     } catch {}
+    if (res.status === 405 || detail === "Method Not Allowed" || detail === "Not Found") {
+      detail = "This page is out of date. Refresh it with Ctrl + Shift + R to load the latest version.";
+    }
     throw new Error(detail);
   }
   return res.status === 204 ? null : res.json();
@@ -34,6 +37,7 @@ export const api = {
   regenerateTrip: (id) => request(`/api/itineraries/${id}/regenerate`, { method: "POST" }),
   regenerateDay: (id, day, instruction) =>
     request(`/api/itineraries/${id}/regenerate-day`, { method: "POST", body: JSON.stringify({ day, instruction }) }),
+  refine: (id, instruction) => request(`/api/itineraries/${id}/refine`, { method: "POST", body: JSON.stringify({ instruction }) }),
   packing: (id) => request(`/api/itineraries/${id}/packing`, { method: "POST" }),
   share: (id) => request(`/api/itineraries/${id}/share`, { method: "POST" }),
   unshare: (id) => request(`/api/itineraries/${id}/share`, { method: "DELETE" }),

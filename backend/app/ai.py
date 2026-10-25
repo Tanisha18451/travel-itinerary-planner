@@ -1,4 +1,5 @@
 """Itinerary generation: LLM via an OpenAI-compatible API, with a built-in demo planner as fallback."""
+import copy
 import json
 import logging
 import random
@@ -289,6 +290,165 @@ def fallback_itinerary(req: TripRequest) -> dict:
 # ---------------------------------------------------------------- advanced features
 class AIUnavailable(Exception):
     """Raised when a feature needs the LLM and it isn't configured or failed."""
+
+
+# ---------------------------------------------------------------- refine: change the plan from a message
+def _trip_cost(it: dict) -> float:
+    return round(sum(float(i.get("cost") or 0) for d in it["days"] for i in d["items"]), 2)
+
+
+def _avg_cost(it: dict, kind: str, fallback: float) -> float:
+    costs = [float(i.get("cost") or 0) for d in it["days"] for i in d["items"] if i.get("type") == kind and i.get("cost")]
+    return sum(costs) / len(costs) if costs else fallback
+
+
+def _has(text: str, words: tuple) -> bool:
+    """True if any keyword starts a word in the text ('rain' matches 'rainy', but not 'train')."""
+    return any(re.search(r"\b" + re.escape(w), text) for w in words)
+
+
+def refine_by_rules(req: TripRequest, itinerary: dict, instruction: str) -> tuple[dict, list[str]]:
+    """Applies common requests directly (no AI needed) and describes exactly what changed."""
+    it = copy.deepcopy(itinerary)
+    days, text, notes = it["days"], instruction.lower(), []
+    cur = req.currency
+    m = re.search(r"\bday\s*(\d+)\b", text)
+    explicit = int(m.group(1)) if m and 1 <= int(m.group(1)) <= len(days) else None
+    targets = [explicit] if explicit else list(range(1, len(days) + 1))
+    where = f"day {explicit}" if explicit else "all days"
+
+    def add(day: int, item: dict) -> None:
+        days[day - 1]["items"].append(item)
+        days[day - 1]["items"].sort(key=lambda i: i.get("time") or "99:99")
+
+    # 1) cheaper
+    if _has(text, ("cheap", "budget", "save", "afford", "less expensive", "lower cost", "reduce cost", "cut cost", "economical")):
+        factors = {"attraction": 0.75, "dining": 0.8, "accommodation": 0.85, "transport": 0.9}
+        before = after = 0.0
+        for n in targets:
+            for i in days[n - 1]["items"]:
+                before += float(i.get("cost") or 0)
+                i["cost"] = round(float(i.get("cost") or 0) * factors.get(i.get("type"), 1), 2)
+                after += i["cost"]
+        notes.append(f"Lowered costs on {where}: {cur} {before:,.0f} to {cur} {after:,.0f} (about {round((1 - after / before) * 100) if before else 0}% less).")
+
+    # 2) more food
+    if _has(text, ("food", "eat", "restaurant", "street", "cafe", "dining", "meal", "snack", "sweet")):
+        names = ["Local street-food tasting walk", "Famous sweet shop and chai stop", "Regional specialty at a popular eatery", "Evening food-market stroll"]
+        price = round(_avg_cost(it, "dining", req.budget * 0.01) * 0.6, 2)
+        for k, n in enumerate(targets):
+            add(n, {"time": "16:30", "type": "dining", "title": names[(n + k) % len(names)], "description": "An extra tasting stop to try more local food.",
+                    "location": req.destination, "cost": price, "duration_min": 45})
+        notes.append(f"Added a food stop to {where} (about {cur} {price:,.0f} each).")
+
+    # 3) slower pace
+    if _has(text, ("relax", "slow", "fewer", "less busy", "less packed", "calm", "chill", "unhurried", "easier")):
+        removed = 0
+        for n in targets:
+            acts = [i for i in days[n - 1]["items"] if i.get("type") == "attraction"]
+            if len(acts) >= 2:
+                days[n - 1]["items"].remove(acts[-1])
+                removed += 1
+        notes.append(f"Slowed the pace: removed the last activity from {removed} day(s)." if removed else "Your days already have few activities, so nothing was removed.")
+
+    # 3b) busier pace
+    if _has(text, ("packed", "busier", "more activities", "more things", "faster", "more to do")):
+        price = round(_avg_cost(it, "attraction", req.budget * 0.02) * 0.7, 2)
+        for n in targets:
+            add(n, {"time": "17:30", "type": "attraction", "title": f"Hidden gems walk in {req.destination}", "description": "An extra stop for travellers who want to see more.",
+                    "location": req.destination, "cost": price, "duration_min": 75})
+        notes.append(f"Added an extra activity to {where}.")
+
+    # 4) rainy-day backup
+    if _has(text, ("rain", "indoor", "monsoon", "wet weather", "bad weather")):
+        price = round(_avg_cost(it, "attraction", req.budget * 0.02) * 0.5, 2)
+        for n in targets:
+            add(n, {"time": "15:00", "type": "attraction", "title": "Rainy-day backup: museum, gallery or covered market",
+                    "description": "If it rains, swap this in for your outdoor stop.", "location": req.destination, "cost": price, "duration_min": 90})
+        notes.append(f"Added a rainy-day backup to {where}.")
+
+    # 5) sunset / sunrise
+    if _has(text, ("sunset", "sunrise", "viewpoint")):
+        day_no = explicit or 1
+        sunrise = "sunrise" in text and "sunset" not in text
+        price = round(_avg_cost(it, "attraction", req.budget * 0.02) * 0.3, 2)
+        add(day_no, {"time": "05:45" if sunrise else "17:45", "type": "attraction", "title": f"{'Sunrise' if sunrise else 'Sunset'} viewpoint in {req.destination}",
+                     "description": "A scenic spot to watch the light change.", "location": req.destination, "cost": price, "duration_min": 60})
+        notes.append(f"Added a {'sunrise' if sunrise else 'sunset'} viewpoint on day {day_no}.")
+
+    # 6) swap X for Y
+    sw = re.search(r"(?:swap|replace|change)\s+(?:the\s+)?([a-z]+?)s?\s+(?:for|with|to)\s+([a-z]+?)s?\b", text)
+    if sw:
+        old, new, count = sw.group(1), sw.group(2), 0
+        for n in targets:
+            for i in days[n - 1]["items"]:
+                if re.search(old, i["title"], re.I):
+                    i["title"] = re.sub(old, new, i["title"], flags=re.I)
+                    i["description"] = re.sub(old, new, i.get("description", ""), flags=re.I)
+                    count += 1
+        notes.append(f'Swapped "{old}" for "{new}" in {count} stop(s).' if count else f'No stops mentioned "{old}", so nothing was swapped.')
+
+    if not notes:  # nothing matched: keep the request as a visible note instead of failing
+        it.setdefault("tips", []).append(f"Your note: {instruction.strip()}")
+        notes.append("I couldn't turn that into an automatic change, so I saved it under \"Good to know\". Try wording like: make it cheaper, add more food stops, slower pace, add a rainy-day option, add a sunset spot on day 2, or swap museums for markets.")
+
+    recompute_totals(it)
+    before_total, after_total = _trip_cost(itinerary), _trip_cost(it)
+    only_cost_note = len(notes) == 1 and notes[0].startswith("Lowered costs") and not explicit
+    if round(before_total) != round(after_total) and not only_cost_note:
+        notes.append(f"Estimated total: {cur} {before_total:,.0f} to {cur} {after_total:,.0f}.")
+    return it, notes
+
+
+def _describe_diff(req: TripRequest, old: dict, new: dict) -> list[str]:
+    notes = ["The AI updated your plan using your request."]
+    sb, sa = sum(len(d["items"]) for d in old["days"]), sum(len(d["items"]) for d in new["days"])
+    if sa != sb:
+        notes.append(f"Stops: {sb} to {sa}.")
+    b, a = _trip_cost(old), _trip_cost(new)
+    if round(a) != round(b):
+        notes.append(f"Estimated total: {req.currency} {b:,.0f} to {req.currency} {a:,.0f}.")
+    changed = sum(1 for o, n in zip(old["days"], new["days"]) if [i["title"] for i in o["items"]] != [i["title"] for i in n["items"]])
+    notes.append(f"{changed} of {len(new['days'])} days changed.")
+    return notes
+
+
+def _refine_with_llm(req: TripRequest, itinerary: dict, instruction: str) -> dict:
+    slim = {k: itinerary[k] for k in ("title", "summary", "days", "tips") if k in itinerary}
+    prompt = (
+        "Current itinerary (JSON):\n" + json.dumps(slim, separators=(",", ":"))
+        + "\n\nTrip details:\n" + _request_summary(req)
+        + f"\n\nUser request: {instruction}\n\n"
+        "Apply the request and return the COMPLETE updated itinerary as one JSON object with the same schema and the same number of days. "
+        "Keep everything the user did not ask to change. Keep the total cost within the budget unless the user asks otherwise."
+    )
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": prompt}]
+    limit = tokens_for(len(slim.get("days", [])) or req.num_days)
+    last: Exception = RuntimeError("no attempt made")
+    for attempt in range(2):
+        try:
+            text = call_llm(messages, max_tokens=limit, json_mode=True, temperature=0.3 if attempt else 0.6)
+            return normalize_itinerary(extract_json(text), req)
+        except (ValueError, KeyError) as exc:  # bad or cut-off JSON: one more try
+            last = exc
+        except Exception as exc:  # network, key, rate limit: retrying won't help
+            last = exc
+            break
+    raise last
+
+
+def refine_itinerary(req: TripRequest, itinerary: dict, instruction: str) -> tuple[dict, list[str], str]:
+    """Returns (updated itinerary, what changed, source). Never fails: if the AI can't help, built-in rules are used."""
+    if config.ai_enabled():
+        try:
+            updated = _refine_with_llm(req, itinerary, instruction)
+            return updated, _describe_diff(req, itinerary, updated), "ai"
+        except Exception as exc:
+            log.warning("AI refine failed (%r); using built-in adjustment", exc)
+            updated, notes = refine_by_rules(req, itinerary, instruction)
+            return updated, ["The AI was busy, so a quick built-in adjustment was applied instead."] + notes, "rules"
+    updated, notes = refine_by_rules(req, itinerary, instruction)
+    return updated, notes, "rules"
 
 
 def _pack(items: list[tuple[str, str]]) -> list[dict]:

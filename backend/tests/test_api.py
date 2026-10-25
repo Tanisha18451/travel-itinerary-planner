@@ -74,3 +74,20 @@ def test_share_and_packing():
     assert client.delete(f"/api/itineraries/{tid}/share").status_code == 200
     assert client.get(f"/api/shared/{token}").status_code == 404
     assert client.get("/api/shared/short").status_code == 404
+
+
+def test_refine_always_shows_what_changed():
+    trip = client.post("/api/itineraries/generate", json=PAYLOAD).json()
+    tid, before = trip["id"], trip["itinerary"]["total_cost"]
+
+    r = client.post(f"/api/itineraries/{tid}/refine", json={"instruction": "make it cheaper"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["refine_notes"] and body["itinerary"]["total_cost"] < before
+
+    r = client.post(f"/api/itineraries/{tid}/refine", json={"instruction": "add a sunset spot on day 2"})
+    assert r.status_code == 200 and any("sunset" in n.lower() for n in r.json()["refine_notes"])
+
+    # a request it cannot map still answers with a note instead of an error
+    r = client.post(f"/api/itineraries/{tid}/refine", json={"instruction": "something unusual"})
+    assert r.status_code == 200 and r.json()["refine_notes"]

@@ -411,3 +411,9 @@ a.btn { text-decoration: none; }
 .profile-text strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; }
 .profile-text span { font-size: 0.8rem; color: #9db3af; }
 @media (max-width: 800px) { .side-extra, .profile { display: none; } }
+
+
+/* result of "Ask the AI to change your plan" */
+.refine-result { margin-top: 1rem; padding: 0.9rem 1rem; border-radius: 12px; background: var(--glass); border: 1px solid var(--harbor); display: grid; gap: 0.4rem; }
+.refine-result strong { display: flex; gap: 0.4rem; align-items: center; }
+.refine-result ul { margin: 0; padding-left: 1.2rem; display: grid; gap: 0.2rem; }

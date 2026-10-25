@@ -36,6 +36,10 @@ class UpdateTrip(BaseModel):
     itinerary: Optional[dict] = None
 
 
+class RefineRequest(BaseModel):
+    instruction: str = Field(min_length=3, max_length=400)
+
+
 class RegenerateDay(BaseModel):
     day: int = Field(ge=1)
     instruction: str = Field(default="", max_length=300)
