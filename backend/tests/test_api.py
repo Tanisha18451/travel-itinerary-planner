@@ -59,7 +59,7 @@ def test_validation():
     assert client.post("/api/itineraries/generate", json=bad).status_code == 422
 
 
-def test_share_packing_refine():
+def test_share_and_packing():
     trip = client.post("/api/itineraries/generate", json=PAYLOAD).json()
     tid = trip["id"]
 
@@ -70,10 +70,6 @@ def test_share_packing_refine():
 
     packed = client.post(f"/api/itineraries/{tid}/packing").json()
     assert len(packed["itinerary"]["packing"]) >= 10
-
-    # without an AI key, refining explains what is needed instead of failing silently
-    r = client.post(f"/api/itineraries/{tid}/refine", json={"instruction": "make it cheaper"})
-    assert r.status_code == 400 and "AI key" in r.json()["detail"]
 
     assert client.delete(f"/api/itineraries/{tid}/share").status_code == 200
     assert client.get(f"/api/shared/{token}").status_code == 404

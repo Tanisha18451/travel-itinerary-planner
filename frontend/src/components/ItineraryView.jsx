@@ -30,7 +30,6 @@ export default function ItineraryView({ trip, onUpdate, onBack, onDelete, notify
   const [instruction, setInstruction] = useState("");
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
-  const [refineText, setRefineText] = useState("");
   const saveSeq = useRef(0);
 
   useEffect(() => {
@@ -107,13 +106,6 @@ export default function ItineraryView({ trip, onUpdate, onBack, onDelete, notify
   const flush = async () => {
     if (dirty) await api.save(trip.id, { itinerary: it }); // never lose manual edits when the AI rewrites the plan
   };
-  const refine = () =>
-    run("refine", async () => {
-      await flush();
-      const updated = await api.refine(trip.id, refineText);
-      setRefineText("");
-      return updated;
-    }, "Itinerary updated");
   const makePacking = () => run("pack", async () => { await flush(); return api.packing(trip.id); }, "Packing list ready");
   const share = () => run("share", () => api.share(trip.id), "Share link created");
   const unshare = () => run("share", () => api.unshare(trip.id), "Sharing turned off");
@@ -289,19 +281,6 @@ export default function ItineraryView({ trip, onUpdate, onBack, onDelete, notify
         </div>
 
         <div className="tools-grid">
-          <section className="panel">
-            <h2 className="panel-title"><Icon name="message" size={18} /> Ask the AI to change your plan</h2>
-            <textarea aria-label="What should change?" rows={3} placeholder="e.g. Make it cheaper, add a sunset spot on day 2, swap museums for markets" value={refineText} onChange={(e) => setRefineText(e.target.value)} />
-            <div className="chips top-gap">
-              {["Make it cheaper", "Add more food stops", "Make the pace more relaxed", "Add a rainy-day option"].map((t) => (
-                <button type="button" key={t} className="chip" onClick={() => setRefineText(t)}>{t}</button>
-              ))}
-            </div>
-            <button className="btn primary top-gap" onClick={refine} disabled={!!busy || refineText.trim().length < 3}>
-              <Icon name="sparkles" size={16} /> {busy === "refine" ? "Updating your plan…" : "Apply change"}
-            </button>
-          </section>
-
           <section className="panel">
             <h2 className="panel-title"><Icon name="bag" size={18} /> Packing list</h2>
             {packing.length === 0 ? (

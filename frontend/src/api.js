@@ -34,7 +34,6 @@ export const api = {
   regenerateTrip: (id) => request(`/api/itineraries/${id}/regenerate`, { method: "POST" }),
   regenerateDay: (id, day, instruction) =>
     request(`/api/itineraries/${id}/regenerate-day`, { method: "POST", body: JSON.stringify({ day, instruction }) }),
-  refine: (id, instruction) => request(`/api/itineraries/${id}/refine`, { method: "POST", body: JSON.stringify({ instruction }) }),
   packing: (id) => request(`/api/itineraries/${id}/packing`, { method: "POST" }),
   share: (id) => request(`/api/itineraries/${id}/share`, { method: "POST" }),
   unshare: (id) => request(`/api/itineraries/${id}/share`, { method: "DELETE" }),

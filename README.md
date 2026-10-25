@@ -60,7 +60,7 @@ Planning a trip means searching many websites for attractions, restaurants, hote
 
 **Wayfinder** removes that work. The traveller enters a destination, dates, total budget, group size, travel style and interests. The app builds a prompt from those inputs, sends it to a generative AI model, then validates the answer and shows a clean, structured plan with attractions, dining, accommodation and transport, each with a time and a cost.
 
-From there the traveller stays in control: they can edit any stop, regenerate a single day, ask the AI to change the plan in plain words, check the weather, tick off a packing list, export to a calendar, print a PDF, or share a read-only link.
+From there the traveller stays in control: they can edit any stop, regenerate a single day, check the weather, tick off a packing list, export to a calendar, print a PDF, or share a read-only link.
 
 ---
 
@@ -72,7 +72,7 @@ A solo traveler has little time to research. They enter a destination, budget, d
 
 ### 💑 Scenario 2: Couple Planning a Personalized Vacation
 
-A couple wants a tailored trip, not generic tourist advice. They pick a relaxed pace, scenic interests and a premium comfort level. The app builds a day-wise plan with curated food and experiences. They edit activities, regenerate specific days, watch the budget bar, and refine the plan together.
+A couple wants a tailored trip, not generic tourist advice. They pick a relaxed pace, scenic interests and a premium comfort level. The app builds a day-wise plan with curated food and experiences. They edit activities, regenerate specific days, watch the budget bar, and adjust the plan together.
 
 ### 👥 Scenario 3: Small Group Coordinating a Multi-Day Trip
 
@@ -82,26 +82,25 @@ Friends organising a multi-day holiday enter the group size and a shared budget,
 
 ## ✨ Key Features
 
-| Area                                  | What it does                                                                                                                                 |
-| :------------------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------- |
-| 🔐 **Accounts**                       | Sign up and sign in with email and password (Supabase Auth). Every user sees only their own trips.                                           |
-| 🧭 **Smart trip builder**             | Destination, dates (up to 14 days), total budget, currency, group size, comfort level, pace, interests and notes, with a live summary panel. |
-| 🤖 **AI itinerary**                   | Day-by-day plan with timed stops for attractions, dining, accommodation and transport, each with a cost.                                     |
-| 🛟 **Automatic fallback**             | If the AI is unavailable, a built-in planner still produces a full itinerary, labelled "Demo plan".                                          |
-| ✏️ **Full editing**                   | Change time, title, description, type and cost of any stop. Add or remove stops. Totals update instantly.                                    |
-| 🔄 **Regenerate**                     | Regenerate one day (with an optional instruction) or the whole trip.                                                                         |
-| 💬 **Ask the AI to change your plan** | Describe a change in plain words, such as "make day 2 cheaper".                                                                              |
-| 💰 **Budget tracking**                | Spend by category (stays, food, activities, transport), per-person per-day cost, and an over-budget warning.                                 |
-| 🌦️ **Weather**                        | Forecast for the destination from Open-Meteo (no API key needed).                                                                            |
-| 🎒 **Packing list**                   | AI-generated checklist for the trip, with progress, custom items and removal.                                                                |
-| 📅 **Calendar export**                | Download an `.ics` file for Google or Apple Calendar.                                                                                        |
-| 🔗 **Share link**                     | Create or revoke a read-only public link to a trip.                                                                                          |
-| 🖨️ **Print / PDF**                    | Clean all-days printout through the browser print dialog.                                                                                    |
-| 📍 **Map links**                      | Open any stop in Google Maps.                                                                                                                |
-| 📊 **Analytics dashboard**            | Next-trip countdown, spend vs budget, spending by category, trips by month, top interests, recent activity, plus search, filter and sort.    |
-| 📑 **Duplicate trips**                | Copy a plan to reuse it for a different date or group.                                                                                       |
-| 🌙 **Dark mode**                      | Light and dark themes.                                                                                                                       |
-| 🛡️ **Rate limiting**                  | Hourly cap on AI requests per user to protect the API key.                                                                                   |
+| Area                       | What it does                                                                                                                                 |
+| :------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🔐 **Accounts**            | Sign up and sign in with email and password (Supabase Auth). Every user sees only their own trips.                                           |
+| 🧭 **Smart trip builder**  | Destination, dates (up to 14 days), total budget, currency, group size, comfort level, pace, interests and notes, with a live summary panel. |
+| 🤖 **AI itinerary**        | Day-by-day plan with timed stops for attractions, dining, accommodation and transport, each with a cost.                                     |
+| 🛟 **Automatic fallback**  | If the AI is unavailable, a built-in planner still produces a full itinerary, labelled "Demo plan".                                          |
+| ✏️ **Full editing**        | Change time, title, description, type and cost of any stop. Add or remove stops. Totals update instantly.                                    |
+| 🔄 **Regenerate**          | Regenerate one day (with an optional instruction) or the whole trip.                                                                         |
+| 💰 **Budget tracking**     | Spend by category (stays, food, activities, transport), per-person per-day cost, and an over-budget warning.                                 |
+| 🌦️ **Weather**             | Forecast for the destination from Open-Meteo (no API key needed).                                                                            |
+| 🎒 **Packing list**        | AI-generated checklist for the trip, with progress, custom items and removal.                                                                |
+| 📅 **Calendar export**     | Download an `.ics` file for Google or Apple Calendar.                                                                                        |
+| 🔗 **Share link**          | Create or revoke a read-only public link to a trip.                                                                                          |
+| 🖨️ **Print / PDF**         | Clean all-days printout through the browser print dialog.                                                                                    |
+| 📍 **Map links**           | Open any stop in Google Maps.                                                                                                                |
+| 📊 **Analytics dashboard** | Next-trip countdown, spend vs budget, spending by category, trips by month, top interests, recent activity, plus search, filter and sort.    |
+| 📑 **Duplicate trips**     | Copy a plan to reuse it for a different date or group.                                                                                       |
+| 🌙 **Dark mode**           | Light and dark themes.                                                                                                                       |
+| 🛡️ **Rate limiting**       | Hourly cap on AI requests per user to protect the API key.                                                                                   |
 
 ---
 
@@ -376,7 +375,6 @@ All routes except `health` and `shared` need `Authorization: Bearer <Supabase to
 | `PUT`    | `/api/itineraries/{id}`                | Save edits (title, itinerary)                    |
 | `POST`   | `/api/itineraries/{id}/regenerate`     | Regenerate the whole trip                        |
 | `POST`   | `/api/itineraries/{id}/regenerate-day` | Regenerate one day, with an optional instruction |
-| `POST`   | `/api/itineraries/{id}/refine`         | Change the plan using a plain-words instruction  |
 | `POST`   | `/api/itineraries/{id}/packing`        | Generate a packing list                          |
 | `POST`   | `/api/itineraries/{id}/duplicate`      | Copy a trip                                      |
 | `POST`   | `/api/itineraries/{id}/share`          | Create a read-only share link                    |
@@ -407,7 +405,7 @@ The backend tests run in demo mode (no keys needed) and cover:
 - health check
 - the full trip flow: generate, list, edit, regenerate a day, regenerate the trip, duplicate, delete
 - input validation (for example, an end date before the start date is rejected)
-- share link, packing list and refine endpoints
+- share link and packing list endpoints
 
 ---
 
@@ -451,9 +449,8 @@ Run `git status` first and confirm no `.env` file is listed.
 3. Click **Generate itinerary** and wait 10 to 20 seconds.
 4. Open the days on the left. Check the budget bar, weather and costs.
 5. Click **Edit this day** to change stops, or **Regenerate day** with an instruction.
-6. Use **Ask the AI to change your plan** for bigger changes in plain words.
-7. Create the **Packing list**, **Add to calendar**, **Share this trip**, or **Print or save PDF**.
-8. Go back to **My trips** to see your dashboard, search, filter and duplicate trips.
+6. Create the **Packing list**, **Add to calendar**, **Share this trip**, or **Print or save PDF**.
+7. Go back to **My trips** to see your dashboard, search, filter and duplicate trips.
 
 <!--
 SCREENSHOTS: add your images to docs/screenshots/ and uncomment the block below.
@@ -473,7 +470,7 @@ SCREENSHOTS: add your images to docs/screenshots/ and uncomment the block below.
 | **1. Vibe Coding Environment Setup**                 | Setup steps above, `requirements.txt`, `package.json`, `.env.example` files |
 | **2. Supabase Database Setup**                       | `supabase/schema.sql`, `backend/app/store.py`, `backend/app/auth.py`        |
 | **3. Preference Collection & Recommendation Engine** | `TripBuilder.jsx`, `schemas.py`, prompt rules in `ai.py`                    |
-| **4. Itinerary Generation & Personalization**        | `ai.py`, `ItineraryView.jsx` (edit, regenerate, refine, packing list)       |
+| **4. Itinerary Generation & Personalization**        | `ai.py`, `ItineraryView.jsx` (edit, regenerate, packing list)               |
 | **5. Productization & Deployment**                   | `Dockerfile`, `render.yaml`, static site serving in `main.py`               |
 | **6. Deployment**                                    | Render deployment steps above                                               |
 | **7. Final Testing & Documentation**                 | `backend/tests/test_api.py`, this README                                    |

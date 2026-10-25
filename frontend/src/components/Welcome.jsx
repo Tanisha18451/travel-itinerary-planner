@@ -13,7 +13,7 @@ const DESTINATIONS = [
 const STEPS = [
   ["Tell us the basics", "Destination, dates, total budget, group size and what you enjoy."],
   ["Get a full plan", "A day-by-day itinerary with stops, timings and a cost for each one."],
-  ["Make it yours", "Edit stops, regenerate a day, or ask the AI to change anything in plain words."],
+  ["Make it yours", "Edit any stop, or regenerate a single day with your own instruction."],
 ];
 
 const FEATURES = [

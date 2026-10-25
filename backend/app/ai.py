@@ -3,6 +3,7 @@ import json
 import logging
 import random
 import re
+import time
 from datetime import timedelta
 
 import httpx
@@ -38,15 +39,39 @@ def _request_summary(req: TripRequest) -> str:
 
 
 # ---------------------------------------------------------------- LLM plumbing
-def call_llm(messages: list[dict]) -> str:
-    resp = httpx.post(
-        f"{config.LLM_BASE_URL.rstrip('/')}/chat/completions",
-        headers={"Authorization": f"Bearer {config.LLM_API_KEY}"},
-        json={"model": config.LLM_MODEL, "messages": messages, "temperature": 0.7, "max_tokens": 4096},
-        timeout=config.LLM_TIMEOUT,
-    )
+def tokens_for(num_days: int) -> int:
+    """Room for a full itinerary: roughly 800 tokens per day, between 4096 and 8000."""
+    return max(4096, min(8000, 800 * num_days + 1200))
+
+
+def call_llm(messages: list[dict], *, max_tokens: int = 4096, json_mode: bool = False, temperature: float = 0.7) -> str:
+    payload = {"model": config.LLM_MODEL, "messages": messages, "temperature": temperature, "max_tokens": max_tokens}
+    if json_mode:
+        payload["response_format"] = {"type": "json_object"}
+    resp = None
+    for attempt in range(3):
+        resp = httpx.post(
+            f"{config.LLM_BASE_URL.rstrip('/')}/chat/completions",
+            headers={"Authorization": f"Bearer {config.LLM_API_KEY}"},
+            json=payload,
+            timeout=config.LLM_TIMEOUT,
+        )
+        if resp.status_code == 429 and attempt < 2:  # rate limit: wait briefly, then try again
+            try:
+                wait = min(float(resp.headers.get("retry-after", 4)), 10.0)
+            except ValueError:
+                wait = 4.0
+            time.sleep(wait)
+            continue
+        if resp.status_code == 400 and "response_format" in payload and "response_format" in resp.text:
+            payload.pop("response_format")  # this provider has no JSON mode: retry without it
+            continue
+        break
     resp.raise_for_status()
-    return resp.json()["choices"][0]["message"]["content"]
+    choice = resp.json()["choices"][0]
+    if choice.get("finish_reason") == "length":
+        raise ValueError("The AI's answer was cut off")
+    return choice["message"]["content"]
 
 
 def extract_json(text: str) -> dict:
@@ -126,7 +151,9 @@ def generate_itinerary(req: TripRequest) -> tuple[dict, str]:
                 [
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": "Plan this trip:\n" + _request_summary(req)},
-                ]
+                ],
+                max_tokens=tokens_for(req.num_days),
+                json_mode=True,
             )
             return normalize_itinerary(extract_json(text), req), "ai"
         except Exception as exc:  # network, rate-limit, bad JSON ... fall back so the app keeps working
@@ -262,26 +289,6 @@ def fallback_itinerary(req: TripRequest) -> dict:
 # ---------------------------------------------------------------- advanced features
 class AIUnavailable(Exception):
     """Raised when a feature needs the LLM and it isn't configured or failed."""
-
-
-def refine_itinerary(req: TripRequest, itinerary: dict, instruction: str) -> dict:
-    """Apply a free-text change ('make it cheaper', 'add a sunset spot') to the whole itinerary."""
-    if not config.ai_enabled():
-        raise AIUnavailable("Changing the plan with a message needs an AI key. Add LLM_API_KEY on the server.")
-    slim = {k: itinerary[k] for k in ("title", "summary", "days", "tips") if k in itinerary}
-    prompt = (
-        "Current itinerary (JSON):\n" + json.dumps(slim, separators=(",", ":"))
-        + "\n\nTrip details:\n" + _request_summary(req)
-        + f"\n\nUser request: {instruction}\n\n"
-        "Apply the request and return the COMPLETE updated itinerary as one JSON object with the same schema and the same number of days. "
-        "Keep everything the user did not ask to change. Keep the total cost within the budget unless the user asks otherwise."
-    )
-    try:
-        text = call_llm([{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": prompt}])
-        return normalize_itinerary(extract_json(text), req)
-    except Exception as exc:
-        log.warning("Refine failed: %s", exc)
-        raise AIUnavailable("The AI couldn't apply that change. Try rewording it, or try again in a moment.")
 
 
 def _pack(items: list[tuple[str, str]]) -> list[dict]:

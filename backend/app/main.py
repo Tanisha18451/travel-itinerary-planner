@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import ai, config, ratelimit
 from .auth import User, get_user
-from .schemas import RefineRequest, RegenerateDay, TripRequest, UpdateTrip
+from .schemas import RegenerateDay, TripRequest, UpdateTrip
 from .store import get_store
 
 logging.basicConfig(level=logging.INFO)
@@ -117,17 +117,6 @@ def regenerate_day(trip_id: str, body: RegenerateDay, user: User = Depends(ai_us
     itinerary["days"][body.day - 1] = new_day
     ai.recompute_totals(itinerary)
     return store.update(user, trip_id, {"itinerary": itinerary, "source": source})
-
-
-@app.post("/api/itineraries/{trip_id}/refine")
-def refine_trip(trip_id: str, body: RefineRequest, user: User = Depends(ai_user)):
-    """Change the plan with a free-text message, e.g. 'make it cheaper'."""
-    store = get_store()
-    trip = _trip_or_404(store, user, trip_id)
-    updated = ai.refine_itinerary(TripRequest(**trip["request"]), trip["itinerary"], body.instruction)
-    if trip["itinerary"].get("packing"):
-        updated["packing"] = trip["itinerary"]["packing"]
-    return store.update(user, trip_id, {"itinerary": updated, "title": updated["title"], "source": "ai"})
 
 
 @app.post("/api/itineraries/{trip_id}/packing")
